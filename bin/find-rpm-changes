@@ -1,0 +1,152 @@
+#!/usr/bin/perl
+#
+# find-rpm-changes - report files whose contents have changed from their rpm versions
+#                    or are not owned by any package
+#
+
+use strict;
+use Getopt::Long;
+use File::Basename;
+use File::Find::Rule;
+use File::Slurp qw(slurp);
+use IPC::Run3;
+use RPM2;
+
+local $SIG{INT} = sub { die "Punt!\n" };
+
+my ($help, @verbose, $empty, $type, @exclude, @exclude_pkg, @exclude_from);
+my ($show_modified, $show_orphans);
+GetOptions(
+  'help|h|?'                => \$help,
+  'verbose|v'               => \@verbose,
+  'empty|e'                 => \$empty,
+  'type|t'                  => \$type,
+  'exclude|x=s@'            => \@exclude,
+  'exclude-package|exclude-pkg=s@'   => \@exclude_pkg,
+  'exclude-from=s@'         => \@exclude_from,
+  'show-modified|m'         => \$show_modified,
+  'show-orphans|o'          => \$show_orphans,
+);
+push @exclude, qw(*.rpmnew *.rpmsave);
+# Default is show both
+$show_modified = $show_orphans = 1 unless $show_modified || $show_orphans;
+
+if ($help || @ARGV != 1) {
+  die "usage: " . basename($0) . " [-v] [-m|-o] [-t] [--exclude=<glob>] [--exclude-from=<file>] <path1> [<path2> ...]\n";
+}
+
+# Load exclude-froms
+for (@exclude_from) {
+  unless (-f $_) {
+    print "Error: invalid exclude file '$_': $!\n";
+    next;
+  }
+  my $ef = slurp $_;
+  chomp $ef;
+  unshift @exclude, grep { /^[^@]\S/ } split /\n/, $ef;
+  unshift @exclude_pkg, map { s/^@//; $_ } grep { /^[@]\S/ } split /\n/, $ef;
+}
+
+# Turn excludes into regexes
+for (@exclude) {
+  # If no wildchars characters and no slashes, we treat as a filename to match
+  if (! m/\*/ && ! m!/!) {
+    $_ = "/$_\$";
+  }
+  else {
+    # Explicitly anchor if absolute
+    s/^/^/            if m!^/!;
+    # Map * into .*
+    s/\*/.*/g;
+  }
+}
+
+# Check paths are valid
+for (@ARGV) {
+  die "Invalid path '$_'\n" unless -d $_;
+}
+
+my $db = RPM2->open_rpm_db or die "opening rpm database failed: $!\n";
+my %package = ();
+
+# Iterate over all files in the given trees
+FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
+  # Exclusions
+  for (@exclude) { 
+    next FILE if $file =~ m/$_/;
+  }
+
+  # If file is owned by a package, add to the %package hash
+  if (my @pkg = $db->find_by_file($file)) {
+    next FILE unless $show_modified;
+
+    for my $pkg (@pkg) {
+      # Add file to list for $pkg
+      my $pname = $pkg->name;
+      $package{$pname} ||= [];
+      push @{$package{$pname}}, $file;
+    }
+  }
+
+  # Orphan file - not owned by any package
+  else {
+    if (-s $file || $empty) {
+      printf "%s%s\n", $type ? 'O ' : '', $file if $show_orphans;
+    }
+  }
+}
+
+# Package verification doesn't seem to be supported - call out to rpm -V manually for now
+my %exclude_pkg = map { $_ => 1 } @exclude_pkg;
+if ($show_modified && keys %package) {
+  for my $pkg (keys %package) {
+    print "+ verifying package $pkg\n" if @verbose;
+    if ($exclude_pkg{$pkg}) {
+      print "++ excluded - skipping package $pkg\n" if @verbose >= 2;
+      next;
+    }
+    my %files = map { $_ => 1 } @{$package{$pkg}};
+    my ($out, $err);
+    my @cmd = qw(rpm -V --nouser --nogroup --nomtime --nomode --nordev --nodeps --nodigest --nosignature);
+    push @cmd, $pkg;
+
+    # Run the verify
+    run3(\@cmd, undef, \$out, \$err);
+
+    # Check the output
+    if ($out) {
+      chomp $out;
+      for (split /\n/, $out) {
+        my @words = split /\s+/;
+        next unless $#words == 2;
+        printf "%s%s\n", $type ? 'M ' : '', $words[2] if $files{$words[2]};
+      }
+    }
+  }
+}
+
+__END__
+
+=head1 NAME
+
+find-rpm-changes - script to report files whose contents have changed from 
+their rpm versions, or which are now owned by and package
+
+=head1 SYNOPSIS
+
+  find-rpm-changes [-m|-o] [-t] [-v] [--exclude=<glob>] [--exclude-from=<file>] <path1> [<path2> ...]
+
+=head1 AUTHOR
+
+Gavin Carr <gavin@openfusion.com.au>.
+
+=head1 COPYRIGHT
+
+Copyright (C) 2007 Gavin Carr. All rights reserved.
+
+This is free software.  You may redistribute copies of it under the  terms  of  the  GNU
+General Public License <http://www.gnu.org/licenses/gpl.html>.  There is NO WARRANTY, to
+the extent permitted by law.
+
+=cut
+
