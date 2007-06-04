@@ -119,7 +119,7 @@ if ($show_modified && keys %package) {
     }
     my %files = map { $_ => 1 } @{$package{$pkg}};
     my ($out, $err);
-    my @cmd = qw(rpm -V --nouser --nogroup --nomtime --nomode --nordev --nodeps --nodigest --nosignature);
+    my @cmd = qw(rpm -V --nouser --nogroup --nomtime --nomode --nordev --nodeps --nodigest --nosignature --noscripts);
     push @cmd, $pkg;
 
     # Run the verify
