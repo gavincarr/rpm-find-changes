@@ -31,9 +31,9 @@ mkdir -p %{buildroot}/var/cache/%{name}
   
 install -m0755 bin/find-rpm-changes %{buildroot}%{_bindir}
 
-install -m0644 etc/exclude* %{buildroot}%{_sysconfigdir}/%{name}
+cp etc/exclude* %{buildroot}%{_sysconfdir}/%{name}
 
-install -m0644 etc/%{name}.cron %{buildroot}%{_sysconfigdir}/cron.d/%[name}
+cp etc/%{name}.cron %{buildroot}%{_sysconfdir}/cron.d/%{name}
 
 %clean
 [ "%{buildroot}" != "/" ] && rm -rf %{buildroot}
@@ -44,7 +44,7 @@ install -m0644 etc/%{name}.cron %{buildroot}%{_sysconfigdir}/cron.d/%[name}
 %{_bindir}/*
 %config(noreplace) %{_sysconfdir}/%{name}/*
 %config(noreplace) %{_sysconfdir}/cron.d/*
-%dir %{buildroot}/var/cache/%{name}
+%dir /var/cache/%{name}
 
 %changelog
 

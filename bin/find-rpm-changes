@@ -11,12 +11,13 @@ use File::Basename;
 use File::Find::Rule;
 use File::Slurp qw(slurp);
 use IPC::Run3;
+use IO::File;
 use RPM2;
 
 local $SIG{INT} = sub { die "Punt!\n" };
 
 my ($help, @verbose, $empty, $type, @exclude, @exclude_pkg, @exclude_from);
-my ($show_modified, $show_orphans);
+my ($show_modified, $show_orphans, $output);
 GetOptions(
   'help|h|?'                => \$help,
   'verbose|v'               => \@verbose,
@@ -27,6 +28,7 @@ GetOptions(
   'exclude-from=s@'         => \@exclude_from,
   'show-modified|m'         => \$show_modified,
   'show-orphans|o'          => \$show_orphans,
+  'output|O=s'              => \$output,
 );
 push @exclude, qw(*.rpmnew *.rpmsave);
 # Default is show both
@@ -36,10 +38,19 @@ if ($help || @ARGV != 1) {
   die "usage: " . basename($0) . " [-v] [-m|-o] [-t] [--exclude=<glob>] [--exclude-from=<file>] <path1> [<path2> ...]\n";
 }
 
+# Setup $out handle
+my $outh;
+if ($output) {
+  $outh = IO::File->new($output, O_WRONLY|O_CREAT, 0600) or die "opening output '$output' failed: $!";
+}
+else {
+  $outh = IO::Handle->new->fdopen(fileno(STDOUT), "w") or die "cloning STDOUT failed: $!";
+} 
+
 # Load exclude-froms
 for (@exclude_from) {
   unless (-f $_) {
-    print "Error: invalid exclude file '$_': $!\n";
+    print STDERR "Error: invalid exclude file '$_': $!\n";
     next;
   }
   my $ef = slurp $_;
@@ -92,7 +103,7 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
   # Orphan file - not owned by any package
   else {
     if (-s $file || $empty) {
-      printf "%s%s\n", $type ? 'O ' : '', $file if $show_orphans;
+      printf $outh "%s%s\n", $type ? 'O ' : '', $file if $show_orphans;
     }
   }
 }
@@ -101,9 +112,9 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
 my %exclude_pkg = map { $_ => 1 } @exclude_pkg;
 if ($show_modified && keys %package) {
   for my $pkg (keys %package) {
-    print "+ verifying package $pkg\n" if @verbose;
+    print STDERR "+ verifying package $pkg\n" if @verbose;
     if ($exclude_pkg{$pkg}) {
-      print "++ excluded - skipping package $pkg\n" if @verbose >= 2;
+      print STDERR "++ excluded - skipping package $pkg\n" if @verbose >= 2;
       next;
     }
     my %files = map { $_ => 1 } @{$package{$pkg}};
@@ -120,7 +131,7 @@ if ($show_modified && keys %package) {
       for (split /\n/, $out) {
         my @words = split /\s+/;
         next unless $#words == 2;
-        printf "%s%s\n", $type ? 'M ' : '', $words[2] if $files{$words[2]};
+        printf $outh "%s%s\n", $type ? 'M ' : '', $words[2] if $files{$words[2]};
       }
     }
   }
