@@ -1,7 +1,7 @@
 
 Name: rpm-find-changes
 Summary: Report files not belonging to an rpm, or that have changed from their rpm versions
-Version: 0.1
+Version: 0.2.1
 Release: 1%{?org_tag}
 Source0: %{name}-%{version}.tar.gz
 License: GPL
@@ -47,6 +47,12 @@ cp etc/%{name}.cron %{buildroot}%{_sysconfdir}/cron.d/%{name}
 %dir /var/cache/%{name}
 
 %changelog
+
+* Tue Jun 05 2007 Gavin Carr <gavin@openfusion.com.au> 0.2.1-1
+- Set O_TRUNC on file output.
+
+* Tue Jun 05 2007 Gavin Carr <gavin@openfusion.com.au> 0.2-1
+- Turn on Getopt::Long case insensitivity and bundling.
 
 * Tue Jun 05 2007 Gavin Carr <gavin@openfusion.com.au> 0.1-1
 - Initial spec file.

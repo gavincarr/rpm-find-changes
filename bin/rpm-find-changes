@@ -6,7 +6,7 @@
 #
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use File::Basename;
 use File::Find::Rule;
 use File::Slurp qw(slurp);
@@ -41,7 +41,7 @@ if ($help || @ARGV != 1) {
 # Setup $out handle
 my $outh;
 if ($output) {
-  $outh = IO::File->new($output, O_WRONLY|O_CREAT, 0600) or die "opening output '$output' failed: $!";
+  $outh = IO::File->new($output, O_WRONLY|O_CREAT|O_TRUNC, 0600) or die "opening output '$output' failed: $!";
 }
 else {
   $outh = IO::Handle->new->fdopen(fileno(STDOUT), "w") or die "cloning STDOUT failed: $!";
