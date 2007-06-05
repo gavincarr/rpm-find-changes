@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# find-rpm-changes - report files in a tree whose contents have changed from 
+# rpm-find-changes - report files in a tree whose contents have changed from 
 #   their rpm versions, or are not owned by any package. It is intended to 
 #   help identify candidate files for backup.
 #
@@ -141,13 +141,13 @@ __END__
 
 =head1 NAME
 
-find-rpm-changes - script to report files in a tree whose contents have changed 
+rpm-find-changes - script to report files in a tree whose contents have changed 
 from their rpm versions, or which are not owned by and package. It is intended
 to help identify candidate files for backup.
 
 =head1 SYNOPSIS
 
-  find-rpm-changes [-m|-o] [-t] [-v] [<exclude-args>] <path1> [<path2> ...]
+  rpm-find-changes [-m|-o] [-t] [-v] [<exclude-args>] <path1> [<path2> ...]
 
 =head1 DESCRIPTION
 
@@ -171,6 +171,8 @@ for modified files, or an 'O', for orphans.
 =item --exclude-package | --exclude-pkg=<package>
 
 =item --exclude-from=<listfile>
+
+=item -O | --output=<outputfile>
 
 =back
 

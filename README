@@ -1,8 +1,8 @@
-find-rpm-changes is a script to report files within a tree whose contents 
+rpm-find-changes is a script to report files within a tree whose contents 
 have changed from their rpm versions, or which are not owned by any rpm.
 It is intended to help identify candidate files for backup.
 
 Usage:
 
-  find-rpm-changes [-m|-o] [-t] [-v] [<exclude-args>] <path> [<path2> ...]
+  rpm-find-changes [-m|-o] [-t] [-v] [<exclude-args>] <path> [<path2> ...]
 

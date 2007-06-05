@@ -1,5 +1,5 @@
 
-Name: find-rpm-changes
+Name: rpm-find-changes
 Summary: Report files not belonging to an rpm, or that have changed from their rpm versions
 Version: 0.1
 Release: 1%{?org_tag}
@@ -13,7 +13,7 @@ BuildArch: noarch
 BuildRequires: perl
 
 %description
-find-rpm-changes is a script to report files within a tree whose contents 
+rpm-find-changes is a script to report files within a tree whose contents 
 have changed from their rpm versions, or which are not owned by any rpm.
 It is intended to help identify candidate files for backup.
 
@@ -29,7 +29,7 @@ mkdir -p %{buildroot}%{_sysconfdir}/%{name}
 mkdir -p %{buildroot}%{_sysconfdir}/cron.d
 mkdir -p %{buildroot}/var/cache/%{name}
   
-install -m0755 bin/find-rpm-changes %{buildroot}%{_bindir}
+install -m0755 bin/rpm-find-changes %{buildroot}%{_bindir}
 
 cp etc/exclude* %{buildroot}%{_sysconfdir}/%{name}
 
