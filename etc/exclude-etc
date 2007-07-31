@@ -12,6 +12,7 @@
 /etc/asound.state
 /etc/prelink.cache
 /etc/.pwd.lock
+/etc/cups/certs
 /etc/X11/X
 /etc/*/log/main
 /etc/*/supervise
