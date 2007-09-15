@@ -1,7 +1,7 @@
 
 Name: rpm-find-changes
 Summary: Report files not belonging to an rpm, or that have changed from their rpm versions
-Version: 0.2.3
+Version: 0.3
 Release: 1%{?org_tag}
 Source0: %{name}-%{version}.tar.gz
 License: GPL
@@ -47,6 +47,9 @@ cp etc/%{name}.cron %{buildroot}%{_sysconfdir}/cron.d/%{name}
 %dir /var/cache/%{name}
 
 %changelog
+
+* Sat Sep 15 2007 Gavin Carr <gavin@openfusion.com.au> 0.3-1
+- Remove RPM2 requirement, to get working on RHEL2 with ancient rpm.
 
 * Wed Aug 01 2007 Gavin Carr <gavin@openfusion.com.au> 0.2.3-1
 - Add /etc/cups/certs to default exclude-etc.

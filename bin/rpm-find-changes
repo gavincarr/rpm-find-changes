@@ -12,7 +12,6 @@ use File::Find::Rule;
 use File::Slurp qw(slurp);
 use IPC::Run3;
 use IO::File;
-use RPM2;
 
 local $SIG{INT} = sub { die "Punt!\n" };
 
@@ -78,7 +77,12 @@ for (@ARGV) {
   die "Invalid path '$_'\n" unless -d $_;
 }
 
-my $db = RPM2->open_rpm_db or die "opening rpm database failed: $!\n";
+my $db;
+# Use RPM2 if available
+eval {
+  require RPM2;
+  $db = RPM2->open_rpm_db or die "opening rpm database failed: $!\n";
+};
 my %package = ();
 
 # Iterate over all files in the given trees
@@ -88,21 +92,42 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
     next FILE if $file =~ m/$_/;
   }
 
-  # If file is owned by a package, add to the %package hash
-  if (my @pkg = $db->find_by_file($file)) {
-    next FILE unless $show_modified;
+  print STDERR "++ checking file $file\n" if @verbose >= 2;
 
-    for my $pkg (@pkg) {
-      # Add file to list for $pkg
-      my $pname = $pkg->name;
-      $package{$pname} ||= [];
-      push @{$package{$pname}}, $file;
+  # If file is owned by a package, add to the %package hash
+  my @pkg;
+  if ($db) {
+    if (@pkg = $db->find_by_file($file)) {
+      next FILE unless $show_modified;
+
+      for my $pkg (@pkg) {
+        # Add file to list for $pkg
+        my $pname = $pkg->name;
+        $package{$pname} ||= [];
+        push @{$package{$pname}}, $file;
+      }
     }
+    next FILE;
+  }
+  
+  # Fall back to 'rpm -qf' if RPM2 not installed
+  my ($pkg, $err);
+  my @cmd = ( qw(rpm -qf), $file );
+  run3(\@cmd, undef, \$pkg, \$err);
+  my $rc = $? >> 8;
+  chomp $pkg;
+  if ($rc == 0) {
+    # Remove version/release components
+    $pkg =~ s/-[^-]+$//;
+    $pkg =~ s/-[^-]+$//;
+    $package{$pkg} ||= [];
+    push @{$package{$pkg}}, $file;
   }
 
   # Orphan file - not owned by any package
   else {
     if (-s $file || $empty) {
+      print STDERR "+ file '$file' is an orphan\n" if @verbose;
       printf $outh "%s%s\n", $type ? 'O ' : '', $file if $show_orphans;
     }
   }
@@ -111,6 +136,13 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
 # Package verification doesn't seem to be supported - call out to rpm -V manually for now
 my %exclude_pkg = map { $_ => 1 } @exclude_pkg;
 if ($show_modified && keys %package) {
+  my $rpm_version = qx(rpm --version);
+  chomp $rpm_version;
+  $rpm_version =~ s/^rpm version //i;
+
+  my @rpm_cmd = qw(rpm -V --nouser --nogroup --nomtime --nomode --nordev --nodeps --nodigest --noscripts);
+  push @rpm_cmd, '--nosignature' unless $rpm_version && $rpm_version < '4.1';
+
   for my $pkg (keys %package) {
     print STDERR "+ verifying package $pkg\n" if @verbose;
     if ($exclude_pkg{$pkg}) {
@@ -119,8 +151,7 @@ if ($show_modified && keys %package) {
     }
     my %files = map { $_ => 1 } @{$package{$pkg}};
     my ($out, $err);
-    my @cmd = qw(rpm -V --nouser --nogroup --nomtime --nomode --nordev --nodeps --nodigest --nosignature --noscripts);
-    push @cmd, $pkg;
+    my @cmd = ( @rpm_cmd, $pkg );
 
     # Run the verify
     run3(\@cmd, undef, \$out, \$err);
