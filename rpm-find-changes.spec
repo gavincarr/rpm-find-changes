@@ -11,7 +11,7 @@ Packager: Gavin Carr <gavin@openfusion.com.au>
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 BuildArch: noarch
 BuildRequires: perl
-Requires: perl-Text-Glob
+Requires: perl-Text-Glob, perl-Number-Compare
 
 %description
 rpm-find-changes is a script to report files within a tree whose contents 
