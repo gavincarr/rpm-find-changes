@@ -107,6 +107,13 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
         push @{$package{$pname}}, $file;
       }
     }
+    # Orphan file - not owned by any package
+    else {
+      if (-s $file || $empty) {
+        print STDERR "+ file '$file' is an orphan\n" if @verbose;
+        printf $outh "%s%s\n", $type ? 'O ' : '', $file if $show_orphans;
+      }
+    }
     next FILE;
   }
   
