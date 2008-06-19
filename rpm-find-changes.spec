@@ -1,7 +1,7 @@
 
 Name: rpm-find-changes
 Summary: Report files not belonging to an rpm, or that have changed from their rpm versions
-Version: 0.3.1
+Version: 0.3.2
 Release: 1%{?org_tag}
 Source0: %{name}-%{version}.tar.gz
 License: GPL
@@ -10,7 +10,7 @@ Group: Applications/File
 Packager: Gavin Carr <gavin@openfusion.com.au>
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 BuildArch: noarch
-BuildRequires: perl
+BuildRequires: perl, /usr/bin/pod2man
 Requires: perl-Text-Glob, perl-Number-Compare
 
 %description
@@ -26,11 +26,14 @@ It is intended to help identify candidate files for backup.
 
 %install
 mkdir -p %{buildroot}%{_bindir} 
+mkdir -p %{buildroot}%{_mandir}/man1
 mkdir -p %{buildroot}%{_sysconfdir}/%{name}
 mkdir -p %{buildroot}%{_sysconfdir}/cron.d
 mkdir -p %{buildroot}/var/cache/%{name}
   
 install -m0755 bin/rpm-find-changes %{buildroot}%{_bindir}
+
+pod2man --section=1 -r "rpm-find-changes $RPM_PACKAGE_VERSION" bin/rpm-find-changes > %{buildroot}%{_mandir}/man1/rpm-find-changes.1
 
 cp etc/exclude* %{buildroot}%{_sysconfdir}/%{name}
 
@@ -43,11 +46,16 @@ cp etc/%{name}.cron %{buildroot}%{_sysconfdir}/cron.d/%{name}
 %defattr(-,root,root)
 %doc README COPYING
 %{_bindir}/*
+%{_mandir}/man1/*
 %config(noreplace) %{_sysconfdir}/%{name}/*
 %config(noreplace) %{_sysconfdir}/cron.d/*
 %dir /var/cache/%{name}
 
 %changelog
+
+* Fri Jun 20 2008 Gavin Carr <gavin@openfusion.com.au> 0.3.2-1
+- Tweak default exclude-etc to not exclude /etc/rc.d/init.d.
+- Add rpm-find-changes.1 man page from pod.
 
 * Fri Oct 05 2007 Gavin Carr <gavin@openfusion.com.au> 0.3.1-1
 - Fix bad bug introduced in 0.3 with orphans not working with RPM2.
