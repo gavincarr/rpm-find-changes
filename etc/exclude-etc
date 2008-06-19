@@ -4,7 +4,7 @@
 *.backup
 *.bak
 /etc/sgml
-/etc/rc.d
+/etc/rc.d/rc*.d
 /etc/alternatives
 /etc/gconf
 /etc/selinux/targeted
