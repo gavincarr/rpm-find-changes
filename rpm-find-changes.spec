@@ -1,7 +1,7 @@
 
 Name: rpm-find-changes
 Summary: Report files not belonging to an rpm, or that have changed from their rpm versions
-Version: 0.3.2
+Version: 0.3.3
 Release: 1%{?org_tag}
 Source0: %{name}-%{version}.tar.gz
 License: GPL
@@ -52,6 +52,9 @@ cp etc/%{name}.cron %{buildroot}%{_sysconfdir}/cron.d/%{name}
 %dir /var/cache/%{name}
 
 %changelog
+
+* Fri Jun 20 2008 Gavin Carr <gavin@openfusion.com.au> 0.3.3-1
+- Exclude core files in default exclude-etc.
 
 * Fri Jun 20 2008 Gavin Carr <gavin@openfusion.com.au> 0.3.2-1
 - Tweak default exclude-etc to not exclude /etc/rc.d/init.d.
