@@ -3,6 +3,7 @@
 *.old
 *.backup
 *.bak
+core*
 /etc/sgml
 /etc/rc.d/rc*.d
 /etc/alternatives
