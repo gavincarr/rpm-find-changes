@@ -15,12 +15,11 @@ use IO::File;
 
 local $SIG{INT} = sub { die "Punt!\n" };
 
-my ($help, @verbose, $empty, $type, @exclude, @exclude_pkg, @exclude_from);
+my ($help, @verbose, $type, @exclude, @exclude_pkg, @exclude_from);
 my ($show_modified, $show_orphans, $output);
 GetOptions(
   'help|h|?'                => \$help,
   'verbose|v'               => \@verbose,
-  'empty|e'                 => \$empty,
   'type|t'                  => \$type,
   'exclude|x=s@'            => \@exclude,
   'exclude-package|exclude-pkg=s@'   => \@exclude_pkg,
@@ -67,6 +66,8 @@ for (@exclude) {
   else {
     # Explicitly anchor if absolute
     s/^/^/            if m!^/!;
+    # Map . to \. if not already escaped
+    s/(?<!\\)\./\\./g;
     # Map * into .*
     s/\*/.*/g;
   }
@@ -109,10 +110,8 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
     }
     # Orphan file - not owned by any package
     else {
-      if (-s $file || $empty) {
-        print STDERR "+ file '$file' is an orphan\n" if @verbose;
-        printf $outh "%s%s\n", $type ? 'O ' : '', $file if $show_orphans;
-      }
+      print STDERR "+ file '$file' is an orphan\n" if @verbose;
+      printf $outh "%s%s\n", $type ? 'O ' : '', $file if $show_orphans;
     }
     next FILE;
   }
@@ -133,10 +132,8 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
 
   # Orphan file - not owned by any package
   else {
-    if (-s $file || $empty) {
-      print STDERR "+ file '$file' is an orphan\n" if @verbose;
-      printf $outh "%s%s\n", $type ? 'O ' : '', $file if $show_orphans;
-    }
+    print STDERR "+ file '$file' is an orphan\n" if @verbose;
+    printf $outh "%s%s\n", $type ? 'O ' : '', $file if $show_orphans;
   }
 }
 
