@@ -4,6 +4,10 @@
 *.backup
 *.bak
 core*
+.cvs/
+.svn/
+.bzr/
+.git/
 /etc/sgml
 /etc/rc.d/rc*.d
 /etc/alternatives
