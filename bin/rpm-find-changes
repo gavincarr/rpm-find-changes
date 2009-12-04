@@ -16,7 +16,7 @@ use IO::File;
 local $SIG{INT} = sub { die "Punt!\n" };
 
 my ($help, @verbose, $type, @exclude, @exclude_pkg, @exclude_from);
-my ($show_modified, $show_orphans, $output, $manual_verify, @only_files);
+my ($show_modified, $show_orphans, $output, @only_files);
 GetOptions(
   'help|h|?'                => \$help,
   'verbose|v'               => \@verbose,
@@ -27,11 +27,10 @@ GetOptions(
   'show-modified|m'         => \$show_modified,
   'show-orphans|o'          => \$show_orphans,
   'output|O=s'              => \$output,
-  'manual-verify'           => \$manual_verify,
   'only=s@'                 => \@only_files,
 );
 push @exclude, qw(*.rpmnew *.rpmsave);
-# Default is show both
+# Default is show both orphans and modified files
 $show_modified = $show_orphans = 1 unless $show_modified || $show_orphans;
 my %only_files = map { $_ => 1 } @only_files;
 
@@ -68,7 +67,7 @@ for (@exclude) {
   }
   else {
     # Explicitly anchor if absolute
-    s/^/^/            if m!^/!;
+    s/^/^/ if m!^/!;
     # Map . to \. if not already escaped
     s/(?<!\\)\./\\./g;
     # Map * into .*
@@ -85,8 +84,10 @@ my $db;
 # Use RPM2 if available
 eval {
   require RPM2;
-  $db = RPM2->open_rpm_db or die "opening rpm database failed: $!\n";
+  $db = RPM2->open_rpm_db or die $!;
+  print STDERR "+ using RPM2\n" if @verbose;
 };
+print STDERR "+ NOT using RPM2\n" if @verbose && ! $db;
 my %package = ();
 
 # Iterate over all files in the given trees
@@ -143,65 +144,43 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
   }
 }
 
-# Package verification doesn't seem to be supported - call out to rpm -V manually for now
-my %exclude_pkg = map { $_ => 1 } @exclude_pkg;
-if ($show_modified && keys %package) {
-  my $rpm_version = qx(rpm --version);
-  chomp $rpm_version;
-  $rpm_version =~ s/^rpm version //i;
-
-  my @rpm_cmd = qw(rpm -V --nouser --nogroup --nomtime --nomode --nordev --nodeps --nodigest --noscripts);
-  push @rpm_cmd, '--nosignature' unless $rpm_version && $rpm_version < '4.1';
-
+# Verify files by manually checking the rpm checksums - rpm -V omits files we care about
+if ($show_modified) {
+  my %exclude_pkg = map { $_ => 1 } @exclude_pkg;
   for my $pkg (keys %package) {
-    print STDERR "+ verifying package $pkg\n" if @verbose;
     if ($exclude_pkg{$pkg}) {
       print STDERR "++ excluded - skipping package $pkg\n" if @verbose >= 2;
       next;
     }
-    my ($out, $err);
+    print STDERR "+ verifying package $pkg\n" if @verbose;
 
     # Run the verify
-    if ($manual_verify) {
-      run3( [ qw(rpm -q --queryformat), '[%{FILENAMES} %{FILEMD5S}\n]', $pkg ], undef, \$out, \$err );
-      die "No files returned for rpm -qf on pkg $pkg\n" unless $out;
-      chomp $out;
-      my %rpm_checksums = map { split /\s+/, $_, 2 } split(/\n/, $out);
+    my ($out, $err);
+    run3( [ qw(rpm -q --queryformat), '[%{FILENAMES} %{FILEMD5S}\n]', $pkg ], undef, \$out, \$err );
+    die "No files returned for rpm -qf on pkg $pkg\n" unless $out;
+    chomp $out;
+    my %rpm_checksums = map { split /\s+/, $_, 2 } split(/\n/, $out);
 
-      for my $file (@{$package{$pkg}}) {
-        # If no checksum found, just treat it as modified
-        if (! $rpm_checksums{ $file }) {
-          printf $outh "%s%s\n", $type ? 'M ' : '', $file;
-          next;
-        }
-        my $checksum = qx(/usr/bin/md5sum $file);
-        chomp $checksum;
-        $checksum =~ s/\s.*$//;
-        if ($checksum ne $rpm_checksums{ $file }) {
-          printf $outh "%s%s\n", $type ? 'M ' : '', $file;
-          next;
-        }
+    for my $file (@{$package{$pkg}}) {
+      # If no checksum found, just treat it as modified
+      if (! $rpm_checksums{ $file }) {
+        printf $outh "%s%s\n", $type ? 'M ' : '', $file;
+        next;
       }
-    }
-
-    # Verify via rpm -V
-    else {
-      my %files = map { $_ => 1 } @{$package{$pkg}};
-      my @cmd = ( @rpm_cmd, $pkg );
-      run3(\@cmd, undef, \$out, \$err);
-
-      # Check the output
-      if ($out) {
-        chomp $out;
-        for (split /\n/, $out) {
-          my @words = split /\s+/;
-          next unless $#words == 2;
-          printf $outh "%s%s\n", $type ? 'M ' : '', $words[2] if $files{$words[2]};
-        }
+      my $checksum = qx(/usr/bin/md5sum $file);
+      chomp $checksum;
+      $checksum =~ s/\s.*$//;
+      if ($checksum ne $rpm_checksums{ $file }) {
+        printf $outh "%s%s\n", $type ? 'M ' : '', $file;
+        next;
       }
     }
   }
 }
+
+# ------------------------------------------------------------------------------
+# Subroutines
+
 
 __END__
 
