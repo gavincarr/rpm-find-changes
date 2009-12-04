@@ -14,8 +14,6 @@ use IPC::Run3;
 use IO::File;
 use Digest::MD5;
 
-local $SIG{INT} = sub { die "Punt!\n" };
-
 sub usage {
   die "usage: " . basename($0) . " [-v] [-m|-o] [-t] [--exclude=<glob>] [--exclude-from=<file>] [-O <outfile>] <path1> [<path2> ...]\n";
 }
@@ -88,7 +86,6 @@ if ($show_modified) {
 }
 
 # Report results
-#   print STDERR "+ file '$file' is an orphan\n" if @verbose;
 my $outh = $output ? 
   IO::File->new($output, O_WRONLY|O_CREAT|O_TRUNC, 0600) :
   IO::Handle->new->fdopen(fileno(STDOUT), "w") 
