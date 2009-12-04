@@ -15,9 +15,13 @@ use IO::File;
 
 local $SIG{INT} = sub { die "Punt!\n" };
 
+sub usage {
+  die "usage: " . basename($0) . " [-v] [-m|-o] [-t] [--exclude=<glob>] [--exclude-from=<file>] [-O <outfile>] <path1> [<path2> ...]\n";
+}
+
 my ($help, @verbose, $show_type, @exclude, @exclude_pkg, @exclude_from);
 my ($show_modified, $show_orphans, $output, @only_files);
-GetOptions(
+usage unless GetOptions(
   'help|h|?'                => \$help,
   'verbose|v'               => \@verbose,
   'show-type|type|t'        => \$show_type,
@@ -29,52 +33,19 @@ GetOptions(
   'output|O=s'              => \$output,
   'only=s@'                 => \@only_files,
 );
+usage if $help || ! @ARGV;
+
+# Argument foo
 push @exclude, qw(*.rpmnew *.rpmsave);
 # Default is show both orphans and modified files
 $show_modified = $show_orphans = 1 unless $show_modified || $show_orphans;
 my %only_files = map { $_ => 1 } @only_files;
-
-if ($help || @ARGV != 1) {
-  die "usage: " . basename($0) . " [-v] [-m|-o] [-t] [--exclude=<glob>] [--exclude-from=<file>] [-O <outfile>] <path1> [<path2> ...]\n";
-}
-
-# Setup $out handle
-# Load exclude-froms
-for (@exclude_from) {
-  unless (-f $_) {
-    print STDERR "Error: invalid exclude file '$_': $!\n";
-    next;
-  }
-  my $ef = slurp $_;
-  chomp $ef;
-  unshift @exclude, grep { /^[^@]\S/ } split /\n/, $ef;
-  unshift @exclude_pkg, map { s/^@//; $_ } grep { /^[@]\S/ } split /\n/, $ef;
-}
-my %exclude_pkg = map { $_ => 1 } @exclude_pkg;
-
-# Turn excludes into regexes
-for (@exclude) {
-  # If no wildchars characters and no slashes, we treat as a filename to match
-  if (! m/\*/ && ! m!/!) {
-    $_ = "/$_\$";
-  }
-  else {
-    # Explicitly anchor if absolute
-    s/^/^/ if m!^/!;
-    # Map . to \. if not already escaped
-    s/(?<!\\)\./\\./g;
-    # Map * into .*
-    s/\*/.*/g;
-  }
-}
-
 # Check paths are valid
-for (@ARGV) {
-  die "Invalid path '$_'\n" unless -d $_;
-}
+-d $_ or die "Invalid path '$_'\n" foreach @ARGV;
 
 my %package = ();
 my %changed_file = ();
+my $exclude_pkg = setup_excludes(\@exclude, \@exclude_pkg, \@exclude_from);
 
 # Iterate over all files in the given trees
 FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
@@ -91,7 +62,7 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
 
   # If file is owned by a package, add to the %package hash
   if (my @pkg = find_package_for_file($file)) {
-    add_packages(\%package, $file, \%exclude_pkg, @pkg);
+    add_packages(\%package, $file, $exclude_pkg, @pkg);
   }
 
   # Otherwise it's an orphan
@@ -134,9 +105,43 @@ for my $file (sort keys %changed_file) {
 # ------------------------------------------------------------------------------
 # Subroutines
 
-my $db;
+sub setup_excludes {
+  my ($exclude, $exclude_pkg, $exclude_from) = @_;
+
+  # Load exclude-froms
+  for (@$exclude_from) {
+    unless (-f $_) {
+      print STDERR "Error: invalid exclude file '$_': $!\n";
+      next;
+    }
+    my $ef = slurp $_;
+    chomp $ef;
+    unshift @$exclude, grep { /^[^@]\S/ } split /\n/, $ef;
+    unshift @$exclude_pkg, map { s/^@//; $_ } grep { /^[@]\S/ } split /\n/, $ef;
+  }
+  my %exclude_pkg = map { $_ => 1 } @$exclude_pkg;
+
+  # Turn excludes into regexes
+  for (@exclude) {
+    # If no wildchars characters and no slashes, we treat as a filename to match
+    if (! m/\*/ && ! m!/!) {
+      $_ = "/$_\$";
+    }
+    else {
+      # Explicitly anchor if absolute
+      s/^/^/ if m!^/!;
+      # Map . to \. if not already escaped
+      s/(?<!\\)\./\\./g;
+      # Map * into .*
+      s/\*/.*/g;
+    }
+  }
+
+  return \%exclude_pkg;
+}
 
 # Return a list of packages owning this file (there can be more than one!)
+my $db;
 sub find_package_for_file {
   my ($file) = @_;
 
