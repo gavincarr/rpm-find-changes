@@ -15,12 +15,12 @@ use IO::File;
 
 local $SIG{INT} = sub { die "Punt!\n" };
 
-my ($help, @verbose, $type, @exclude, @exclude_pkg, @exclude_from);
+my ($help, @verbose, $show_type, @exclude, @exclude_pkg, @exclude_from);
 my ($show_modified, $show_orphans, $output, @only_files);
 GetOptions(
   'help|h|?'                => \$help,
   'verbose|v'               => \@verbose,
-  'type|t'                  => \$type,
+  'show-type|type|t'        => \$show_type,
   'exclude|x=s@'            => \@exclude,
   'exclude-package|exclude-pkg=s@'   => \@exclude_pkg,
   'exclude-from=s@'         => \@exclude_from,
@@ -35,18 +35,10 @@ $show_modified = $show_orphans = 1 unless $show_modified || $show_orphans;
 my %only_files = map { $_ => 1 } @only_files;
 
 if ($help || @ARGV != 1) {
-  die "usage: " . basename($0) . " [-v] [-m|-o] [-t] [--exclude=<glob>] [--exclude-from=<file>] <path1> [<path2> ...]\n";
+  die "usage: " . basename($0) . " [-v] [-m|-o] [-t] [--exclude=<glob>] [--exclude-from=<file>] [-O <outfile>] <path1> [<path2> ...]\n";
 }
 
 # Setup $out handle
-my $outh;
-if ($output) {
-  $outh = IO::File->new($output, O_WRONLY|O_CREAT|O_TRUNC, 0600) or die "opening output '$output' failed: $!";
-}
-else {
-  $outh = IO::Handle->new->fdopen(fileno(STDOUT), "w") or die "cloning STDOUT failed: $!";
-} 
-
 # Load exclude-froms
 for (@exclude_from) {
   unless (-f $_) {
@@ -80,21 +72,15 @@ for (@ARGV) {
   die "Invalid path '$_'\n" unless -d $_;
 }
 
-my $db;
-# Use RPM2 if available
-eval {
-  require RPM2;
-  $db = RPM2->open_rpm_db or die $!;
-  print STDERR "+ using RPM2\n" if @verbose;
-};
-print STDERR "+ NOT using RPM2\n" if @verbose && ! $db;
 my %package = ();
+my %changed_file = ();
 
 # Iterate over all files in the given trees
 FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
-  if (@only_files) {
-    next unless exists $only_files{$file};
-  }
+
+  # If @only_files is set, skip everything else
+  next if @only_files and ! exists $only_files{$file};
+
   # Exclusions
   for (@exclude) { 
     next FILE if $file =~ m/$_/;
@@ -103,44 +89,12 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
   print STDERR "++ checking file $file\n" if @verbose >= 2;
 
   # If file is owned by a package, add to the %package hash
-  my @pkg;
-  if ($db) {
-    if (@pkg = $db->find_by_file($file)) {
-      next FILE unless $show_modified;
-
-      for my $pkg (@pkg) {
-        # Add file to list for $pkg
-        my $pname = $pkg->name;
-        $package{$pname} ||= [];
-        push @{$package{$pname}}, $file;
-      }
-    }
-    # Orphan file - not owned by any package
-    elsif ($show_orphans) {
-      print STDERR "+ file '$file' is an orphan\n" if @verbose;
-      printf $outh "%s%s\n", $type ? 'O ' : '', $file;
-    }
-    next FILE;
+  if (my @pkg = find_package_for_file($file)) {
+    add_packages(\%package, $file, @pkg);
   }
-  
-  # Fall back to 'rpm -qf' if RPM2 not installed
-  my ($pkg, $err);
-  my @cmd = ( qw(rpm -qf), $file );
-  run3(\@cmd, undef, \$pkg, \$err);
-  my $rc = $? >> 8;
-  chomp $pkg;
-  if ($rc == 0) {
-    # Remove version/release components
-    $pkg =~ s/-[^-]+$//;
-    $pkg =~ s/-[^-]+$//;
-    $package{$pkg} ||= [];
-    push @{$package{$pkg}}, $file;
-  }
-
-  # Orphan file - not owned by any package
-  elsif ($show_orphans) {
-    print STDERR "+ file '$file' is an orphan\n" if @verbose;
-    printf $outh "%s%s\n", $type ? 'O ' : '', $file;
+  # Otherwise it's an orphan
+  else {
+    $changed_file{ $file } = 'O' if $show_orphans;
   }
 }
 
@@ -164,23 +118,77 @@ if ($show_modified) {
     for my $file (@{$package{$pkg}}) {
       # If no checksum found, just treat it as modified
       if (! $rpm_checksums{ $file }) {
-        printf $outh "%s%s\n", $type ? 'M ' : '', $file;
+        $changed_file{$file} = 'M';
         next;
       }
+
       my $checksum = qx(/usr/bin/md5sum $file);
       chomp $checksum;
       $checksum =~ s/\s.*$//;
-      if ($checksum ne $rpm_checksums{ $file }) {
-        printf $outh "%s%s\n", $type ? 'M ' : '', $file;
-        next;
-      }
+      $changed_file{$file} = 'M' 
+        if $checksum ne $rpm_checksums{ $file };
     }
   }
 }
 
+# Report results
+#   print STDERR "+ file '$file' is an orphan\n" if @verbose;
+my $outh = $output ? 
+  IO::File->new($output, O_WRONLY|O_CREAT|O_TRUNC, 0600) :
+  IO::Handle->new->fdopen(fileno(STDOUT), "w") 
+    or die "opening output failed: $!";
+for my $file (sort keys %changed_file) {
+  if ($show_type) {
+    printf $outh "%s %s\n", $changed_file{$file}, $file;
+  }
+  else {
+    printf $outh "$file\n";
+  }
+}
+
+
 # ------------------------------------------------------------------------------
 # Subroutines
 
+my $db;
+
+# Return a list of packages owning this file (there can be more than one!)
+sub find_package_for_file {
+  my ($file) = @_;
+
+  if (! defined $db) {
+    $db = eval { require RPM2; RPM2->open_rpm_db };
+    $db ||= 0;
+  }
+
+  if ($db) {
+    return map { $_->name } $db->find_by_file($file);
+  }
+  else {
+    # Fall back to 'rpm -qf' if no RPM2
+    my $pkg;
+    run3( [ 'rpm', '-qf', $file ], undef, \$pkg, undef);
+    my $rc = $? >> 8;
+    if ($rc == 0) {
+      # Remove version/release components
+      chomp $pkg;
+      $pkg =~ s/-[^-]+$//;
+      $pkg =~ s/-[^-]+$//;
+      return ($pkg);
+    }
+  }
+}
+
+sub add_packages {
+  my ($packages, $file, @pkg) = @_;
+
+  # Add file to list for $pkg
+  for my $pkg (@pkg) {
+    $packages->{$pkg} ||= [];
+    push @{$packages->{$pkg}}, $file;
+  }
+}
+  
 
 __END__
 
