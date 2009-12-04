@@ -12,6 +12,7 @@ use File::Find::Rule;
 use File::Slurp qw(slurp);
 use IPC::Run3;
 use IO::File;
+use Digest::MD5;
 
 local $SIG{INT} = sub { die "Punt!\n" };
 
@@ -188,10 +189,11 @@ sub get_rpm_checksums {
   my $out;
   run3( [ qw(rpm -q --queryformat), '[%{FILENAMES} %{FILEMD5S}\n]', $pkg ], undef, \$out, undef );
   chomp $out;
-  die "No files returned for rpm -qf on pkg $pkg\n" unless $out;
+  die "Error: no files returned for rpm -qf on pkg $pkg\n" unless $out;
   return map { split /\s+/, $_, 2 } split(/\n/, $out);
 }
 
+my $md5;
 sub checksums_match {
   my ($file, $expected) = @_;
 
@@ -199,9 +201,11 @@ sub checksums_match {
   return 0 if ! $expected;
 
   # Calculate checksum and check
-  my $checksum = qx(/usr/bin/md5sum $file);
-  chomp $checksum;
-  $checksum =~ s/\s.*$//;
+  $md5 ||= Digest::MD5->new;
+  my $fh = IO::File->new( $file, 'r' )
+    or die "Error: cannot read file '$file' to calculate checksum - aborting\n";
+  $fh->binmode;
+  my $checksum = $md5->addfile($fh)->hexdigest;
   return $checksum eq $expected;
 }
 
@@ -250,7 +254,7 @@ Gavin Carr <gavin@openfusion.com.au>.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2007 Gavin Carr. All rights reserved.
+Copyright (C) 2007-2009 Gavin Carr. All rights reserved.
 
 This is free software.  You may redistribute copies of it under the  terms  of  the  GNU
 General Public License <http://www.gnu.org/licenses/gpl.html>.  There is NO WARRANTY, to
