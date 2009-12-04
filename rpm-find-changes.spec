@@ -1,7 +1,7 @@
 
 Name: rpm-find-changes
 Summary: Report files not belonging to an rpm, or that have changed from their rpm versions
-Version: 0.3.4
+Version: 0.4
 Release: 1%{?org_tag}
 Source0: %{name}-%{version}.tar.gz
 License: GPL
@@ -11,7 +11,7 @@ Packager: Gavin Carr <gavin@openfusion.com.au>
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 BuildArch: noarch
 BuildRequires: perl, /usr/bin/pod2man
-Requires: perl-Text-Glob, perl-Number-Compare
+Requires: perl(RPM2)
 
 %description
 rpm-find-changes is a script to report files within a tree whose contents 
@@ -52,6 +52,10 @@ cp etc/%{name}.cron %{buildroot}%{_sysconfdir}/cron.d/%{name}
 %dir /var/cache/%{name}
 
 %changelog
+
+* Thu Dec 04 2009 Gavin Carr <gavin@openfusion.com.au> 0.4-1
+- Replace rpm -V verification with manual checksum verification using Digest::MD5.
+- Refactor old bodgy code into subroutines.
 
 * Thu Dec 03 2009 Gavin Carr <gavin@openfusion.com.au> 0.3.4-1
 - Remove skipping of empty files - now record everything.
