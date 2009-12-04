@@ -50,6 +50,7 @@ for (@exclude_from) {
   unshift @exclude, grep { /^[^@]\S/ } split /\n/, $ef;
   unshift @exclude_pkg, map { s/^@//; $_ } grep { /^[@]\S/ } split /\n/, $ef;
 }
+my %exclude_pkg = map { $_ => 1 } @exclude_pkg;
 
 # Turn excludes into regexes
 for (@exclude) {
@@ -90,8 +91,9 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
 
   # If file is owned by a package, add to the %package hash
   if (my @pkg = find_package_for_file($file)) {
-    add_packages(\%package, $file, @pkg);
+    add_packages(\%package, $file, \%exclude_pkg, @pkg);
   }
+
   # Otherwise it's an orphan
   else {
     $changed_file{ $file } = 'O' if $show_orphans;
@@ -100,33 +102,15 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
 
 # Verify files by manually checking the rpm checksums - rpm -V omits files we care about
 if ($show_modified) {
-  my %exclude_pkg = map { $_ => 1 } @exclude_pkg;
   for my $pkg (keys %package) {
-    if ($exclude_pkg{$pkg}) {
-      print STDERR "++ excluded - skipping package $pkg\n" if @verbose >= 2;
-      next;
-    }
     print STDERR "+ verifying package $pkg\n" if @verbose;
 
     # Run the verify
-    my ($out, $err);
-    run3( [ qw(rpm -q --queryformat), '[%{FILENAMES} %{FILEMD5S}\n]', $pkg ], undef, \$out, \$err );
-    die "No files returned for rpm -qf on pkg $pkg\n" unless $out;
-    chomp $out;
-    my %rpm_checksums = map { split /\s+/, $_, 2 } split(/\n/, $out);
+    my %rpm_checksums = get_rpm_checksums($pkg);
 
     for my $file (@{$package{$pkg}}) {
-      # If no checksum found, just treat it as modified
-      if (! $rpm_checksums{ $file }) {
-        $changed_file{$file} = 'M';
-        next;
-      }
-
-      my $checksum = qx(/usr/bin/md5sum $file);
-      chomp $checksum;
-      $checksum =~ s/\s.*$//;
-      $changed_file{$file} = 'M' 
-        if $checksum ne $rpm_checksums{ $file };
+      $changed_file{$file} = 'M'
+        unless checksums_match($file, $rpm_checksums{ $file });
     }
   }
 }
@@ -180,15 +164,41 @@ sub find_package_for_file {
 }
 
 sub add_packages {
-  my ($packages, $file, @pkg) = @_;
+  my ($packages, $file, $exclude_pkg, @pkg) = @_;
 
   # Add file to list for $pkg
   for my $pkg (@pkg) {
+    if ($exclude_pkg->{$pkg}) {
+      print STDERR "++ $pkg excluded - skipping\n" if @verbose >= 2;
+      next;
+    }
+
     $packages->{$pkg} ||= [];
     push @{$packages->{$pkg}}, $file;
   }
 }
   
+sub get_rpm_checksums {
+  my ($pkg) = @_;
+  my $out;
+  run3( [ qw(rpm -q --queryformat), '[%{FILENAMES} %{FILEMD5S}\n]', $pkg ], undef, \$out, undef );
+  chomp $out;
+  die "No files returned for rpm -qf on pkg $pkg\n" unless $out;
+  return map { split /\s+/, $_, 2 } split(/\n/, $out);
+}
+
+sub checksums_match {
+  my ($file, $expected) = @_;
+
+  # If no checksum given, treat as modified
+  return 0 if ! $expected;
+
+  # Calculate checksum and check
+  my $checksum = qx(/usr/bin/md5sum $file);
+  chomp $checksum;
+  $checksum =~ s/\s.*$//;
+  return $checksum eq $expected;
+}
 
 __END__
 
