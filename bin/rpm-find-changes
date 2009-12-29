@@ -201,7 +201,7 @@ sub checksums_match {
   $md5 ||= Digest::MD5->new;
   my $fh = IO::File->new( $file, 'r' )
     or die "Error: cannot read file '$file' to calculate checksum - aborting\n";
-  $fh->binmode;
+  binmode $fh;
   my $checksum = $md5->addfile($fh)->hexdigest;
   return $checksum eq $expected;
 }
