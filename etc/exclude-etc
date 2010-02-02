@@ -13,6 +13,7 @@ core*
 /etc/cups/certs
 /etc/gconf
 /etc/ld.so.cache
+/etc/mtab
 /etc/prelink.cache
 /etc/.pwd.lock
 /etc/rc.d/rc*.d
