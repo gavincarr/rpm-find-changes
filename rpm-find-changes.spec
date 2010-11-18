@@ -1,7 +1,7 @@
 
 Name: rpm-find-changes
 Summary: Report files not belonging to an rpm, or that have changed from their rpm versions
-Version: 0.4.1
+Version: 0.5
 Release: 1%{?org_tag}
 Source0: %{name}-%{version}.tar.gz
 License: GPL
@@ -52,6 +52,9 @@ cp etc/%{name}.cron %{buildroot}%{_sysconfdir}/cron.d/%{name}
 %dir /var/cache/%{name}
 
 %changelog
+* Thu Nov 18 2010 Gavin Carr <gavin@openfusion.com.au> 0.5-1
+- Fix nasty bug with exclude patterns interacting with default exclude-etc.
+
 * Tue Dec 29 2009 Gavin Carr <gavin@openfusion.com.au> 0.4.1-1
 - Tweak use of binmode for old versions of IO::File.
 
