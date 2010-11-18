@@ -121,13 +121,18 @@ sub setup_excludes {
 
   # Turn excludes into regexes
   for (@exclude) {
-    # If no wildchars characters and no slashes, we treat as a filename to match
+    # If no wildchars characters and no slashes, treat as a basename filename to match
     if (! m/\*/ && ! m!/!) {
       $_ = "/$_\$";
     }
     else {
       # Explicitly anchor if absolute
       s/^/^/ if m!^/!;
+      # If no slashes, assume it matches the whole path, and anchor both ends
+      if (! m{/}) {
+        s/^/^/ unless m/^\^/;
+        s/$/\$/ unless m/\$$/;
+      }
       # Map . to \. if not already escaped
       s/(?<!\\)\./\\./g;
       # Map * into .*
