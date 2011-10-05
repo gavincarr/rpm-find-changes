@@ -2,7 +2,7 @@
 Name: rpm-find-changes
 Summary: Report files not belonging to an rpm, or that have changed from their rpm versions
 Version: 0.5.1
-Release: 1%{?org_tag}
+Release: 2%{?org_tag}%{dist}
 Source0: %{name}-%{version}.tar.gz
 License: GPL
 URL: http://www.openfusion.com.au/labs/
@@ -52,6 +52,9 @@ cp etc/%{name}.cron %{buildroot}%{_sysconfdir}/cron.d/%{name}
 %dir /var/cache/%{name}
 
 %changelog
+* Wed Oct 05 2011 Gavin Carr <gavin@openfusion.com.au> 0.5.1-2
+- Add missing %dist tag to spec file release, for c5/c6 compatibility.
+
 * Wed Oct 05 2011 Gavin Carr <gavin@openfusion.com.au> 0.5.1-1
 - Minor updates to perldocs, change licence to GPLv3.
 
