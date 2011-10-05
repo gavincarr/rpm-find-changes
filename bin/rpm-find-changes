@@ -215,8 +215,8 @@ __END__
 
 =head1 NAME
 
-rpm-find-changes - script to report files in a tree whose contents have changed 
-from their rpm versions, or which are not owned by and package. It is intended
+rpm-find-changes - a script to report files in a tree whose contents have changed 
+from their rpm versions, or which are not owned by any package. It is intended
 to help identify candidate files for backup.
 
 =head1 SYNOPSIS
@@ -233,7 +233,13 @@ The following arguments are supported:
 
 =item -m | --show-modified
 
+Report only files that have changed from their packaged versions. By default
+both modified and orphan files are reported.
+
 =item -o | --show-orphans
+
+Report only files that are not owned by any package. By default both
+modified and orphan files are reported.
 
 =item -t | --type
 
@@ -248,6 +254,8 @@ for modified files, or an 'O', for orphans.
 
 =item -O | --output=<outputfile>
 
+Output to the given file. By default rpm-find-changes outputs to stdout.
+
 =back
 
 =head1 AUTHOR
@@ -256,11 +264,20 @@ Gavin Carr <gavin@openfusion.com.au>.
 
 =head1 COPYRIGHT
 
-Copyright (C) 2007-2009 Gavin Carr. All rights reserved.
+Copyright 2007-2011 Gavin Carr.
 
-This is free software.  You may redistribute copies of it under the  terms  of  the  GNU
-General Public License <http://www.gnu.org/licenses/gpl.html>.  There is NO WARRANTY, to
-the extent permitted by law.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 =cut
 
