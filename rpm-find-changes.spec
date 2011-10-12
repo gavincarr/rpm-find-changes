@@ -1,8 +1,8 @@
 
 Name: rpm-find-changes
 Summary: Report files not belonging to an rpm, or that have changed from their rpm versions
-Version: 0.5.1
-Release: 2%{?org_tag}%{dist}
+Version: 0.6
+Release: 1%{?org_tag}%{dist}
 Source0: %{name}-%{version}.tar.gz
 License: GPL
 URL: http://www.openfusion.com.au/labs/
@@ -11,7 +11,8 @@ Packager: Gavin Carr <gavin@openfusion.com.au>
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 BuildArch: noarch
 BuildRequires: perl, /usr/bin/pod2man
-Requires: perl(RPM2)
+Requires: perl(Digest::MD5)
+Requires: perl(Digest::SHA)
 
 %description
 rpm-find-changes is a script to report files within a tree whose contents 
@@ -52,6 +53,9 @@ cp etc/%{name}.cron %{buildroot}%{_sysconfdir}/cron.d/%{name}
 %dir /var/cache/%{name}
 
 %changelog
+* Wed Oct 12 2011 Gavin Carr <gavin@openfusion.com.au> 0.6-1
+- Update rpm-find-changes to calculate sha256 digests for rpm 4.6+.
+
 * Wed Oct 05 2011 Gavin Carr <gavin@openfusion.com.au> 0.5.1-2
 - Add missing %dist tag to spec file release, for c5/c6 compatibility.
 
