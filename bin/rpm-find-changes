@@ -19,11 +19,12 @@ sub usage {
   die "usage: " . basename($0) . " [-v] [-m|-o] [-t] [--exclude=<glob>] [--exclude-from=<file>] [-O <outfile>] <path1> [<path2> ...]\n";
 }
 
-my ($help, @verbose, $show_type, @exclude, @exclude_pkg, @exclude_from);
+my $verbose = 0;
+my ($help, $show_type, @exclude, @exclude_pkg, @exclude_from);
 my ($show_modified, $show_orphans, $output, @only_files);
 usage unless GetOptions(
   'help|h|?'                => \$help,
-  'verbose|v'               => \@verbose,
+  'verbose|v+'              => \$verbose,
   'show-type|type|t'        => \$show_type,
   'exclude|x=s@'            => \@exclude,
   'exclude-package|exclude-pkg=s@'   => \@exclude_pkg,
@@ -58,7 +59,7 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
     next FILE if $file =~ m/$_/;
   }
 
-  print STDERR "++ checking file $file\n" if @verbose >= 2;
+  print STDERR "++ checking file $file\n" if $verbose >= 2;
 
   # If file is owned by a package, add to the %package hash
   if (my @pkg = find_package_for_file($file)) {
@@ -74,7 +75,7 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
 # Verify files by manually checking the rpm checksums - rpm -V omits files we care about
 if ($show_modified) {
   for my $pkg (keys %package) {
-    print STDERR "+ verifying package $pkg\n" if @verbose;
+    print STDERR "+ verifying package $pkg\n" if $verbose;
 
     # Run the verify
     my %rpm_checksums = get_rpm_checksums($pkg);
@@ -178,7 +179,7 @@ sub add_packages {
   # Add file to list for $pkg
   for my $pkg (@pkg) {
     if ($exclude_pkg->{$pkg}) {
-      print STDERR "++ $pkg excluded - skipping\n" if @verbose >= 2;
+      print STDERR "++ $pkg excluded - skipping\n" if $verbose >= 2;
       next;
     }
 
@@ -218,6 +219,8 @@ sub checksums_match {
 
   return 1 if $checksum eq $expected;
 
+  print STDERR "++ checksum mismatch for file '$file':\n   got $checksum, expected $expected\n"
+    if $verbose >= 2;
   return 0;
 }
 
