@@ -197,6 +197,14 @@ sub get_rpm_checksums {
   return map { split /\s+/, $_, 2 } split(/\n/, $out);
 }
 
+sub digest_factory {
+  my ($expected) = @_;
+  return Digest::MD5->new      if length $expected == 32;
+  return Digest::SHA->new(256) if length $expected == 64;
+  return Digest::SHA->new(512) if length $expected == 128;
+  die sprintf "Unknown digest type found: %s, length %d", $expected, length $expected;
+}
+
 my $dig;
 sub checksums_match {
   my ($file, $expected) = @_;
@@ -209,8 +217,8 @@ sub checksums_match {
 
   # Calculate checksum and check
   my $hashlen = length $expected;
-  # RPM >= 4.8 (?) has switched to sha256 checksums instead of md5
-  $dig ||= $hashlen == 32 ? Digest::MD5->new : Digest::SHA->new(256);
+  # RPM >= 4.6 (?) allows sha256 and sha512 checksums as well as md5
+  $dig ||= digest_factory($expected);
   my $fh = IO::File->new( $file, 'r' )
     or die "Error: cannot read file '$file' to calculate checksum - aborting\n";
   binmode $fh;
