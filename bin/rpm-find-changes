@@ -21,7 +21,7 @@ sub usage {
 
 my $verbose = 0;
 my ($help, $show_type, @exclude, @exclude_pkg, @exclude_from);
-my ($show_modified, $show_orphans, $output, @only_files);
+my ($show_modified, $show_orphans, $output, @only_files, $warnings);
 usage unless GetOptions(
   'help|h|?'                => \$help,
   'verbose|v+'              => \$verbose,
@@ -33,6 +33,7 @@ usage unless GetOptions(
   'show-orphans|o'          => \$show_orphans,
   'output|O=s'              => \$output,
   'only=s@'                 => \@only_files,
+  'warnings|warn|w'         => \$warnings,
 );
 usage if $help || ! @ARGV;
 
@@ -82,7 +83,7 @@ if ($show_modified) {
 
     for my $file (@{$package{$pkg}}) {
       $changed_file{$file} = 'M'
-        unless checksums_match($file, $rpm_checksums{ $file });
+        unless checksums_match($pkg, $file, $rpm_checksums{ $file });
     }
   }
 }
@@ -191,10 +192,10 @@ sub add_packages {
 sub get_rpm_checksums {
   my ($pkg) = @_;
   my $out;
-  run3( [ qw(rpm -q --queryformat), '[%{FILENAMES} %{FILEMD5S}\n]', $pkg ], undef, \$out, undef );
+  run3( [ qw(rpm -q --dump), $pkg ], undef, \$out, undef );
   chomp $out;
-  die "Error: no files returned for rpm -qf on pkg $pkg\n" unless $out;
-  return map { split /\s+/, $_, 2 } split(/\n/, $out);
+  die "Error: no files returned for 'rpm -q --dump' on pkg $pkg\n" unless $out;
+  return map { (split /\s+/, $_)[0,3] } split(/\n/, $out);
 }
 
 sub digest_factory {
@@ -207,11 +208,11 @@ sub digest_factory {
 
 my $dig;
 sub checksums_match {
-  my ($file, $expected) = @_;
+  my ($pkg, $file, $expected) = @_;
 
   # If no checksum given, treat as modified
   if (! $expected) {
-    warn "No expected checksum received for file '$file'";
+    warn "No expected checksum received for file '$file' (pkg $pkg)\n" if $warnings;
     return 0;
   }
 
