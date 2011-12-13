@@ -1,7 +1,7 @@
 
 Name: rpm-find-changes
 Summary: Report files not belonging to an rpm, or that have changed from their rpm versions
-Version: 0.6.1
+Version: 0.6.2
 Release: 1%{?org_tag}%{dist}
 Source0: %{name}-%{version}.tar.gz
 License: GPL
@@ -53,6 +53,9 @@ cp etc/%{name}.cron %{buildroot}%{_sysconfdir}/cron.d/%{name}
 %dir /var/cache/%{name}
 
 %changelog
+* Tue Dec 13 2011 Gavin Carr <gavin@openfusion.com.au> 0.6.2-1
+- Tweak get_rpm_checksums to ignore symlinks, which are always zero.
+
 * Tue Oct 18 2011 Gavin Carr <gavin@openfusion.com.au> 0.6.1-1
 - Change from (broken?) -q --queryformat to -q --dump for checksums.
 
