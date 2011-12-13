@@ -19,9 +19,10 @@ sub usage {
   die "usage: " . basename($0) . " [-v] [-m|-o] [-t] [--exclude=<glob>] [--exclude-from=<file>] [-O <outfile>] <path1> [<path2> ...]\n";
 }
 
+my $warnings = 1;
 my $verbose = 0;
 my ($help, $show_type, @exclude, @exclude_pkg, @exclude_from);
-my ($show_modified, $show_orphans, $output, @only_files, $warnings);
+my ($show_modified, $show_orphans, $output, @only_files);
 usage unless GetOptions(
   'help|h|?'                => \$help,
   'verbose|v+'              => \$verbose,
@@ -33,7 +34,7 @@ usage unless GetOptions(
   'show-orphans|o'          => \$show_orphans,
   'output|O=s'              => \$output,
   'only=s@'                 => \@only_files,
-  'warnings|warn|w'         => \$warnings,
+  'warnings|warn|w!'        => \$warnings,
 );
 usage if $help || ! @ARGV;
 
@@ -75,15 +76,20 @@ FILE: for my $file ( File::Find::Rule->file()->in( @ARGV ) ) {
 
 # Verify files by manually checking the rpm checksums - rpm -V omits files we care about
 if ($show_modified) {
+  printf STDERR "+ checking %d packages for modifications\n", scalar keys %package if $verbose;
+
   for my $pkg (keys %package) {
     print STDERR "+ verifying package $pkg\n" if $verbose;
 
     # Run the verify
-    my %rpm_checksums = get_rpm_checksums($pkg);
+    my $rpm_checksums = get_rpm_checksums($pkg);
 
     for my $file (@{$package{$pkg}}) {
+      # Skip symlinks
+      next if $rpm_checksums->{ $file } eq 'SYMLINK';
+
       $changed_file{$file} = 'M'
-        unless checksums_match($pkg, $file, $rpm_checksums{ $file });
+        unless checksums_match($pkg, $file, $rpm_checksums->{ $file });
     }
   }
 }
@@ -189,13 +195,23 @@ sub add_packages {
   }
 }
   
+# Extract rpm checksums from rpm --dump output
 sub get_rpm_checksums {
   my ($pkg) = @_;
   my $out;
+
   run3( [ qw(rpm -q --dump), $pkg ], undef, \$out, undef );
   chomp $out;
   die "Error: no files returned for 'rpm -q --dump' on pkg $pkg\n" unless $out;
-  return map { (split /\s+/, $_)[0,3] } split(/\n/, $out);
+
+  my %checksum;
+  for my $entry (split(/\n/, $out)) {
+    my @entry = split /\s+/, $entry;
+
+    $checksum{ $entry[0] } = $entry[10] eq 'X' ? $entry[3] : 'SYMLINK';
+  }
+
+  return \%checksum;
 }
 
 sub digest_factory {
