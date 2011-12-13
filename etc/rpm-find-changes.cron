@@ -1,4 +1,4 @@
 
 # Find rpm changes in the /etc tree
-0 0 * * * root /usr/bin/rpm-find-changes --exclude-from=/etc/rpm-find-changes/exclude-etc -O /var/cache/rpm-find-changes/etc.txt /etc
+0 0 * * * root /usr/bin/rpm-find-changes --no-warnings --exclude-from=/etc/rpm-find-changes/exclude-etc -O /var/cache/rpm-find-changes/etc.txt /etc
 
